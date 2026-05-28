@@ -131,8 +131,8 @@ def map_courses_to_sfia(courses_file: str, sfia_file: str, model: str, ps_name: 
                     "Nilai": [course_row["Course Title"], sfia_row["SFIA_Skill_Level"], score]
                 })
 
-                os.makedirs(f"Output3/{ps_name}/Mapping", exist_ok=True)
-                with pd.ExcelWriter(f"Output3/{ps_name}/Mapping/contoh_vektor_perbandingan_{model}.xlsx") as writer:
+                os.makedirs(f"Tanpa Filtering/{ps_name}/Mapping", exist_ok=True)
+                with pd.ExcelWriter(f"Tanpa Filtering/{ps_name}/Mapping/contoh_vektor_perbandingan_{model}.xlsx") as writer:
                     df_compare.to_excel(writer, index=False, sheet_name="TF-IDF Comparison")
                     metadata.to_excel(writer, index=False, sheet_name="Metadata")
 
@@ -142,11 +142,11 @@ def map_courses_to_sfia(courses_file: str, sfia_file: str, model: str, ps_name: 
         return
 
     filtered_df = pd.DataFrame(all_matches).sort_values(by=["Course", "Similarity"], ascending=[True, False])
-    filtered_df.to_excel(f"Output3/{ps_name}/Mapping/mapping_cosine_{model}_{ps_name}.xlsx", index=False)
+    filtered_df.to_excel(f"Tanpa Filtering/{ps_name}/Mapping/mapping_cosine_{model}_{ps_name}.xlsx", index=False)
 
     # Ekspansi SFIA skill level pakai expand_skill_levels
     expanded_df = expand_skill_levels(filtered_df, sfia_df)
-    expanded_df.to_excel(f"Output3/{ps_name}/Mapping/expanded_mapping_cosine_{model}_{ps_name}.xlsx", index=False)
+    expanded_df.to_excel(f"Tanpa Filtering/{ps_name}/Mapping/expanded_mapping_cosine_{model}_{ps_name}.xlsx", index=False)
 
 
     print(f"[{ps_name}] Mapping '{model}' selesai. ({len(filtered_df)} baris hasil awal).")
@@ -169,8 +169,8 @@ if __name__ == "__main__":
             print(f"\n=== Mapping {ps} dengan {model} ===")
             try:
                 map_courses_to_sfia(
-                    f"Output3/{ps}/Ekstraksi/skills_extracted_courses_{ps}.xlsx",
-                    f"Output3/{ps}/Ekstraksi/skills_extracted_sfia_{ps}.xlsx",
+                    f"Tanpa Filtering/{ps}/Ekstraksi/skills_extracted_courses_{ps}.xlsx",
+                    f"Tanpa Filtering/{ps}/Ekstraksi/skills_extracted_sfia_{ps}.xlsx",
                     model,
                     ps,
                     threshold=0.2

@@ -18,7 +18,7 @@ def create_skill_filter(sfia_df):
     sfia_vectors = vectorizer.fit_transform(sfia_skill_names)
     return vectorizer, sfia_vectors
 
-def filter_extracted_skills(skills_to_filter, vectorizer, sfia_vectors, threshold=0.1):
+def filter_extracted_skills(skills_to_filter, vectorizer, sfia_vectors, threshold=0.9):
     if not isinstance(skills_to_filter, list) or not skills_to_filter:
         return []
     
@@ -45,7 +45,7 @@ def count_skills_per_row(skills_column):
     return skills_column.apply(lambda x: len(x) if isinstance(x, list) else 0)
 
 # --- FUNGSI UTAMA ---
-def extract_all_skills(course_file: str, sfia_file: str, ps_name: str, filter_threshold=0.1):
+def extract_all_skills(course_file: str, sfia_file: str, ps_name: str, filter_threshold=0.9):
     courses_df = pd.read_excel(course_file)
     sfia_df = pd.read_excel(sfia_file)
 
@@ -117,7 +117,7 @@ def extract_all_skills(course_file: str, sfia_file: str, ps_name: str, filter_th
 
     # Simpan hasil tabel summary
     summary_df = pd.DataFrame(results_summary)
-    output_dir = f"Output3/{ps_name}/Ekstraksi"
+    output_dir = f"Output09/{ps_name}/Ekstraksi"
     os.makedirs(output_dir, exist_ok=True)
     summary_df.to_excel(f"{output_dir}/tabel_summary_filtering_{ps_name}.xlsx", index=False)
     
@@ -127,8 +127,8 @@ if __name__ == '__main__':
     program_studies = ["UNAIR_IS", "ITS_IS"]
     for ps in program_studies:
         summary = extract_all_skills(
-            f"Output3/{ps}/Preprocessing/processed_courses_{ps}.xlsx",
-            f"Output3/{ps}/Preprocessing/processed_sfia_{ps}.xlsx",
+            f"Output09/{ps}/Preprocessing/processed_courses_{ps}.xlsx",
+            f"Output09/{ps}/Preprocessing/processed_sfia_{ps}.xlsx",
             ps
         )
         print(f"\n--- Hasil Tabel untuk {ps} ---")

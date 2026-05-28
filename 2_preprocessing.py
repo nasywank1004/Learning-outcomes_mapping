@@ -29,7 +29,7 @@ if __name__ == '__main__':
 
     base_dir = os.path.dirname(os.path.abspath(__file__))  
     data_dir = os.path.join(base_dir, "Data")
-    output_base = os.path.join(base_dir, "Output3")
+    output_base = os.path.join(base_dir, "Output02")
 
     for cluster_name in cluster_names:
         print(f"\n=== Processing cluster: {cluster_name} ===")
