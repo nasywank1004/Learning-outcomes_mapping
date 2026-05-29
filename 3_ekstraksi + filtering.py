@@ -13,25 +13,29 @@ from utils.skill_extraction import (
 
 # --- FUNGSI FILTERING ---
 def create_skill_filter(sfia_df):
+    """Membuat 'kamus' validasi dari NAMA skill asli SFIA."""
     sfia_skill_names = sfia_df['Skill'].unique().tolist()
     vectorizer = TfidfVectorizer()
     sfia_vectors = vectorizer.fit_transform(sfia_skill_names)
     return vectorizer, sfia_vectors
 
-def filter_extracted_skills(skills_to_filter, vectorizer, sfia_vectors, threshold=0.9):
+def filter_extracted_skills(skills_to_filter, vectorizer, sfia_vectors, threshold=0.1):
+    """Memfilter daftar skill berdasarkan kemiripan dengan kamus SFIA."""
     if not isinstance(skills_to_filter, list) or not skills_to_filter:
         return []
     
+    # Pastikan semua elemen adalah string
     skills_to_filter_str = [str(s) for s in skills_to_filter]
-    skill_vectors = vectorizer.transform(skills_to_filter_str)
-    
-    if skill_vectors.shape[0] == 0:
-        return []
-        
-    similarity_matrix = cosine_similarity(skill_vectors, sfia_vectors)
     filtered_skills = []
     
+    # Transformasi input menjadi vector
+    skill_vectors = vectorizer.transform(skills_to_filter_str)
+    
+    # Hitung similarity
+    similarity_matrix = cosine_similarity(skill_vectors, sfia_vectors)
+    
     for i in range(len(skills_to_filter_str)):
+        # Ambil nilai kemiripan tertinggi untuk setiap kandidat skill
         if similarity_matrix[i].max() >= threshold:
             filtered_skills.append(skills_to_filter_str[i])
             
@@ -39,97 +43,142 @@ def filter_extracted_skills(skills_to_filter, vectorizer, sfia_vectors, threshol
 
 # --- FUNGSI PEMBANTU ---
 def safe_get(df, col_name):
-    return df[col_name].fillna('') if col_name in df.columns else pd.Series([''] * len(df))
+    """Return kolom jika ada, kalau tidak ada return Series kosong"""
+    if col_name in df.columns:
+        return df[col_name].fillna('')
+    else:
+        return pd.Series([''] * len(df), index=df.index)
 
 def count_skills_per_row(skills_column):
     return skills_column.apply(lambda x: len(x) if isinstance(x, list) else 0)
 
 # --- FUNGSI UTAMA ---
-def extract_all_skills(course_file: str, sfia_file: str, ps_name: str, filter_threshold=0.9):
+def extract_all_skills(course_file: str, sfia_file: str, ps_name: str, filter_threshold=0.1):
     courses_df = pd.read_excel(course_file)
     sfia_df = pd.read_excel(sfia_file)
 
     # Inisialisasi Filter
+    print(f"[{ps_name}] Menyiapkan kamus filter SFIA...")
     skill_vectorizer, sfia_skill_vectors = create_skill_filter(sfia_df)
 
-    # Pre-processing text
+    # === 1. PROSES EKSTRAKSI COURSES ===
+    print(f"[{ps_name}] Mengekstraksi keterampilan dari data Courses...")
     courses_df['merged_text'] = (
         safe_get(courses_df, 'course_description_cleaned') + ' ' +
         safe_get(courses_df, 'LO_cleaned') + ' ' +
         safe_get(courses_df, 'course_content_cleaned')
     )
 
-    # Daftar model sesuai urutan tabel Anda
-    models_mapping = {
-        'SkillNER': 'SkillNER',
-        'SkillNER + Query Expansion': 'SkillNER_QE',
-        'SkillNER + RAKE': 'SkillNER_RAKE',
-        'SkillNER + YAKE': 'SkillNER_YAKE',
-        'SkillNER + KeyBERT': 'SkillNER_KeyBERT'
-    }
+    # Ekstraksi dasar
+    courses_df['SkillNER'] = courses_df['merged_text'].apply(extract_skills_skillner)
+    courses_df['SkillNER_QE'] = courses_df['merged_text'].apply(extract_skills_skillner_qe)
+    courses_df['RAKE'] = courses_df['merged_text'].apply(extract_rake_keywords)
+    courses_df['YAKE'] = courses_df['merged_text'].apply(extract_yake_keywords)
+    courses_df['KeyBERT'] = courses_df['merged_text'].apply(extract_keybert_keywords)
 
-    results_summary = []
+    # Logika Penggabungan (Ensemble)
+    courses_df['SkillNER_RAKE'] = courses_df.apply(lambda r: list(set(r['SkillNER']).union(r['RAKE'])), axis=1)
+    courses_df['SkillNER_YAKE'] = courses_df.apply(lambda r: list(set(r['SkillNER']).union(r['YAKE'])), axis=1)
+    courses_df['SkillNER_KeyBERT'] = courses_df.apply(lambda r: list(set(r['SkillNER']).union(r['KeyBERT'])), axis=1)
 
-    # Loop untuk dataset SFIA dan dataset Universitas
-    datasets = [
-        (sfia_df, 'Level_Description_cleaned', 'SFIA'),
-        (courses_df, 'merged_text', f'SI {ps_name.split("_")[0]}') # Contoh: SI UNAIR atau SI ITS
+    # === 2. PROSES EKSTRAKSI SFIA ===
+    print(f"[{ps_name}] Mengekstraksi keterampilan dari data SFIA...")
+    sfia_df['SkillNER'] = sfia_df['Level_Description_cleaned'].apply(extract_skills_skillner)
+    sfia_df['SkillNER_QE'] = sfia_df['Level_Description_cleaned'].apply(extract_skills_skillner_qe)
+    sfia_df['RAKE'] = sfia_df['Level_Description_cleaned'].apply(extract_rake_keywords)
+    sfia_df['YAKE'] = sfia_df['Level_Description_cleaned'].apply(extract_yake_keywords)
+    sfia_df['KeyBERT'] = sfia_df['Level_Description_cleaned'].apply(extract_keybert_keywords)
+
+    # Logika Penggabungan (Ensemble)
+    sfia_df['SkillNER_RAKE'] = sfia_df.apply(lambda r: list(set(r['SkillNER']).union(r['RAKE'])), axis=1)
+    sfia_df['SkillNER_YAKE'] = sfia_df.apply(lambda r: list(set(r['SkillNER']).union(r['YAKE'])), axis=1)
+    sfia_df['SkillNER_KeyBERT'] = sfia_df.apply(lambda r: list(set(r['SkillNER']).union(r['KeyBERT'])), axis=1)
+
+    skill_columns = [
+        'SkillNER', 
+        'SkillNER_QE', 
+        'RAKE', 
+        'YAKE', 
+        'KeyBERT',
+        'SkillNER_RAKE', 
+        'SkillNER_YAKE', 
+        'SkillNER_KeyBERT'
     ]
 
-    for df, text_col, dataset_label in datasets:
-        print(f"Processing {dataset_label}...")
-        
-        # Ekstraksi Dasar
-        df['SkillNER'] = df[text_col].apply(extract_skills_skillner)
-        df['SkillNER_QE'] = df[text_col].apply(extract_skills_skillner_qe)
-        rake = df[text_col].apply(extract_rake_keywords)
-        yake = df[text_col].apply(extract_yake_keywords)
-        kbert = df[text_col].apply(extract_keybert_keywords)
+    # === 3. FILTERING (TAHAPAN PENYARINGAN) ===
+    print(f"[{ps_name}] Menerapkan filtering SFIA Similarity (Threshold={filter_threshold})...")
+    for col in skill_columns:
+        # Filter untuk Courses
+        courses_df[col] = courses_df[col].apply(
+            lambda x: filter_extracted_skills(x, skill_vectorizer, sfia_skill_vectors, filter_threshold)
+        )
+        # Filter untuk SFIA
+        sfia_df[col] = sfia_df[col].apply(
+            lambda x: filter_extracted_skills(x, skill_vectorizer, sfia_skill_vectors, filter_threshold)
+        )
 
-        # Ensemble
-        df['SkillNER_RAKE'] = [list(set(a).union(b)) for a, b in zip(df['SkillNER'], rake)]
-        df['SkillNER_YAKE'] = [list(set(a).union(b)) for a, b in zip(df['SkillNER'], yake)]
-        df['SkillNER_KeyBERT'] = [list(set(a).union(b)) for a, b in zip(df['SkillNER'], kbert)]
+    # === 4. FINALISASI & STATISTIK ===
+    # Tambahkan nama skill asli SFIA ke semua list ekstraksi
+    for col in skill_columns:
+        sfia_df[col] = sfia_df.apply(
+            lambda row: list(set(row[col] + [row['Skill']])) if isinstance(row[col], list) else [row['Skill']],
+            axis=1
+        )
 
-        # Hitung statistik untuk setiap model sesuai urutan gambar
-        for display_name, col_name in models_mapping.items():
-            # 1. Sebelum Filtering
-            count_before = count_skills_per_row(df[col_name]).sum()
-            
-            # 2. Proses Filtering
-            df[col_name] = df[col_name].apply(
-                lambda x: filter_extracted_skills(x, skill_vectorizer, sfia_skill_vectors, filter_threshold)
-            )
-            
-            # Khusus SFIA: Tambahkan kembali skill aslinya agar tidak hilang jika similarity rendah
-            if dataset_label == 'SFIA':
-                 df[col_name] = [list(set(x + [s])) for x, s in zip(df[col_name], df['Skill'])]
-
-            # 3. Sesudah Filtering
-            count_after = count_skills_per_row(df[col_name]).sum()
-
-            results_summary.append({
-                'Jenis Dataset': dataset_label,
-                'Model': display_name,
-                'Jumlah Skill Sebelum Filtering': count_before,
-                'Jumlah Skill Sesudah Filtering': count_after
+    # Hitung Statistik
+    courses_stats, sfia_stats = [], []
+    for df, stats_list, label in [(courses_df, courses_stats, "Courses"), (sfia_df, sfia_stats, "SFIA")]:
+        print(f"Menghitung statistik untuk {label}...")
+        for col in skill_columns:
+            count_col = col + '_count'
+            df[count_col] = count_skills_per_row(df[col])
+            stats_list.append({
+                'Method': col,
+                'Mean': df[count_col].mean(),
+                'Min': df[count_col].min(),
+                'Max': df[count_col].max(),
+                'Non-zero Count': (df[count_col] > 0).sum()
             })
 
-    # Simpan hasil tabel summary
-    summary_df = pd.DataFrame(results_summary)
-    output_dir = f"Output09/{ps_name}/Ekstraksi"
+    # Simpan Statistik
+    output_dir = f"Output/{ps_name}/Ekstraksi"
     os.makedirs(output_dir, exist_ok=True)
-    summary_df.to_excel(f"{output_dir}/tabel_summary_filtering_{ps_name}.xlsx", index=False)
-    
-    return summary_df
+    with pd.ExcelWriter(f"{output_dir}/skill_count_statistics_{ps_name}.xlsx", engine='openpyxl') as writer:
+        pd.DataFrame(courses_stats).to_excel(writer, sheet_name="Courses", index=False)
+        pd.DataFrame(sfia_stats).to_excel(writer, sheet_name="SFIA", index=False)
+
+    return courses_df, sfia_df
+
 
 if __name__ == '__main__':
+    start_total = time.time()
+    
+    # Konfigurasi
     program_studies = ["UNAIR_IS", "ITS_IS"]
+    THRESHOLD_FILTER = 0.1  # Nilai ambang batas kemiripan SFIA
+
     for ps in program_studies:
-        summary = extract_all_skills(
-            f"Output09/{ps}/Preprocessing/processed_courses_{ps}.xlsx",
-            f"Output09/{ps}/Preprocessing/processed_sfia_{ps}.xlsx",
-            ps
+        print(f"\n" + "="*50)
+        print(f"PROCESSING DATA: {ps}")
+        print("="*50)
+        
+        # Eksekusi
+        c_res, s_res = extract_all_skills(
+            f"Output/{ps}/Preprocessing/processed_courses_{ps}.xlsx", 
+            f"Output/{ps}/Preprocessing/processed_sfia_{ps}.xlsx",
+            ps,
+            filter_threshold=THRESHOLD_FILTER
         )
-        print(f"\n--- Hasil Tabel untuk {ps} ---")
-        print(summary.to_string(index=False))
+
+        # Simpan file hasil ekstraksi
+        output_path = f"Output/{ps}/Ekstraksi"
+        os.makedirs(output_path, exist_ok=True)
+        
+        c_res.to_excel(f"{output_path}/skills_extracted_courses_{ps}.xlsx", index=False)
+        s_res.to_excel(f"{output_path}/skills_extracted_sfia_{ps}.xlsx", index=False)
+        
+        print(f"Files saved for {ps} in {output_path}")
+
+    print(f"\n" + "="*50)
+    print(f"TOTAL RUNTIME: {time.time() - start_total:.2f} detik")
+    print("="*50)

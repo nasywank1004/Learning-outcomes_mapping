@@ -84,8 +84,8 @@ if __name__ == '__main__':
         for model in MODELS:
             sim_type = "cosine"
 
-            original_path = f"Tanpa Filtering/{ps}/Mapping/mapping_{sim_type}_{model}_{ps}.xlsx"
-            expanded_path = f"Tanpa Filtering/{ps}/Mapping/expanded_mapping_{sim_type}_{model}_{ps}.xlsx"
+            original_path = f"Output/{ps}/Mapping/mapping_{sim_type}_{model}_{ps}.xlsx"
+            expanded_path = f"Output/{ps}/Mapping/expanded_mapping_{sim_type}_{model}_{ps}.xlsx"
 
             res_orig = evaluate_single_mapping(original_path, gt_set, model, ps, expanded=False)
             res_expd = evaluate_single_mapping(expanded_path, gt_set, model, ps, expanded=True)
@@ -98,7 +98,7 @@ if __name__ == '__main__':
         # simpan hasil khusus prodi ini
         if ps_results:
             final_df = pd.concat(ps_results, ignore_index=True)
-            out_path = f"Tanpa Filtering/{ps}/Evaluasi/evaluation_results_{ps}.xlsx"
+            out_path = f"Output/{ps}/Evaluasi/evaluation_results_{ps}.xlsx"
             final_df.to_excel(out_path, index=False)
             print(f"[{ps}] Hasil evaluasi disimpan ke: {out_path}")
             print(final_df)

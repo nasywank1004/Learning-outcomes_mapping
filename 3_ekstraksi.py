@@ -92,7 +92,7 @@ def extract_all_skills(course_file: str, sfia_file: str, ps_name: str):
             })
 
     # Simpan Statistik
-    output_dir = f"Output1/{ps_name}/Ekstraksi"
+    output_dir = f"Output/{ps_name}/Ekstraksi"
     os.makedirs(output_dir, exist_ok=True)
     with pd.ExcelWriter(f"{output_dir}/skill_count_statistics_{ps_name}.xlsx", engine='openpyxl') as writer:
         pd.DataFrame(courses_stats).to_excel(writer, sheet_name="Courses", index=False)
@@ -111,13 +111,13 @@ if __name__ == '__main__':
         print("="*50)
         
         c_res, s_res = extract_all_skills(
-            f"Output1/{ps}/Preprocessing/processed_courses_{ps}.xlsx",
-            f"Output1/{ps}/Preprocessing/processed_sfia_{ps}.xlsx",
+            f"Output/{ps}/Preprocessing/processed_courses_{ps}.xlsx",
+            f"Output/{ps}/Preprocessing/processed_sfia_{ps}.xlsx",
             ps
         )
 
-        c_res.to_excel(f"Output1/{ps}/Ekstraksi/skills_extracted_courses_{ps}.xlsx", index=False)
-        s_res.to_excel(f"Output1/{ps}/Ekstraksi/skills_extracted_sfia_{ps}.xlsx", index=False)
+        c_res.to_excel(f"Output/{ps}/Ekstraksi/skills_extracted_courses_{ps}.xlsx", index=False)
+        s_res.to_excel(f"Output/{ps}/Ekstraksi/skills_extracted_sfia_{ps}.xlsx", index=False)
         print(f"Files saved for {ps}")
 
     print(f"\n" + "="*50)
